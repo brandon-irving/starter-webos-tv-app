@@ -1,0 +1,22 @@
+{
+  "name": "starter-webos-tv-app",
+  "private": true,
+  "description": "Starter template for LG webOS TV web apps",
+  "scripts": {
+    "setup:cli": "bash scripts/install-cli.sh",
+    "pair": "bash scripts/pair-tv.sh",
+    "doctor": "bash scripts/doctor.sh",
+    "new": "bash scripts/create-app.sh",
+    "deploy": "bash scripts/deploy.sh",
+    "dev": "bash scripts/tv.sh dev",
+    "package": "bash scripts/tv.sh package",
+    "install-tv": "bash scripts/tv.sh install",
+    "launch": "bash scripts/tv.sh launch",
+    "close": "bash scripts/tv.sh close",
+    "inspect": "bash scripts/tv.sh inspect",
+    "uninstall": "bash scripts/tv.sh uninstall",
+    "list": "bash scripts/tv.sh list",
+    "tv-info": "bash scripts/tv.sh info",
+    "sim": "bash scripts/tv.sh sim"
+  }
+}

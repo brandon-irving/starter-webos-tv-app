@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>Starter</title>
+	<style>
+		* { box-sizing: border-box; }
+		html, body { margin: 0; width: 100%; height: 100%; }
+		body {
+			background: #14161a;
+			color: #f2f2f2;
+			font-family: "LG Smart UI", Arial, sans-serif;
+			/* TV overscan safe area: keep content ~5% from the edges */
+			padding: 54px 96px;
+		}
+		h1 { font-size: 64px; margin: 0 0 8px; }
+		.sub { font-size: 28px; color: #9aa0a6; margin-bottom: 48px; }
+		.row { display: flex; gap: 32px; margin-bottom: 48px; }
+		.tile {
+			width: 320px; height: 180px; border-radius: 16px;
+			background: #262a31; font-size: 32px;
+			display: flex; align-items: center; justify-content: center;
+			border: 4px solid transparent; transition: transform 120ms, border-color 120ms;
+		}
+		/* Focus must be obvious from 3 metres away */
+		.tile.focused { border-color: #e6007e; transform: scale(1.08); background: #333842; }
+		.panel { font-size: 26px; line-height: 1.6; color: #c8ccd2; }
+		.panel b { color: #fff; }
+	</style>
+</head>
+
+<body>
+	<h1>webOS Starter</h1>
+	<div class="sub">Use the arrow keys and OK on the remote. Back exits.</div>
+
+	<div class="row" id="tiles">
+		<div class="tile">Movies</div>
+		<div class="tile">Shows</div>
+		<div class="tile">Music</div>
+		<div class="tile">Settings</div>
+	</div>
+
+	<div class="panel">
+		<div>Last key: <b id="lastKey">none</b></div>
+		<div>Selected: <b id="selected">none</b></div>
+		<div>Device: <b id="device">loading…</b></div>
+		<div>TV clock (UTC): <b id="clock">loading…</b></div>
+		<div>Resolution: <b id="res"></b></div>
+	</div>
+
+	<script src="webOSTVjs-1.2.13/webOSTV.js" charset="utf-8"></script>
+	<script src="webOSTVjs-1.2.13/webOSTV-dev.js" charset="utf-8"></script>
+	<script>
+		var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, ENTER: 13, BACK: 461 };
+		var tiles = document.querySelectorAll(".tile");
+		var focusIndex = 0;
+
+		function setFocus(i) {
+			tiles[focusIndex].classList.remove("focused");
+			focusIndex = (i + tiles.length) % tiles.length;
+			tiles[focusIndex].classList.add("focused");
+		}
+		setFocus(0);
+
+		// Magic Remote pointer: hovering a tile moves focus to it
+		Array.prototype.forEach.call(tiles, function (tile, i) {
+			tile.addEventListener("mouseover", function () { setFocus(i); });
+			tile.addEventListener("click", function () { select(); });
+		});
+
+		function select() {
+			document.getElementById("selected").textContent = tiles[focusIndex].textContent;
+		}
+
+		document.addEventListener("keydown", function (e) {
+			document.getElementById("lastKey").textContent = e.keyCode + (e.key ? " (" + e.key + ")" : "");
+			switch (e.keyCode) {
+				case KEY.LEFT: setFocus(focusIndex - 1); break;
+				case KEY.RIGHT: setFocus(focusIndex + 1); break;
+				case KEY.ENTER: select(); break;
+				case KEY.BACK:
+					// Delivered because disableBackHistoryAPI=true in appinfo.json.
+					// platformBack() hands control back to the TV (exits to launcher).
+					if (window.webOS && webOS.platformBack) webOS.platformBack();
+					break;
+				default: return;
+			}
+			e.preventDefault();
+		});
+
+		document.getElementById("res").textContent = window.innerWidth + "x" + window.innerHeight;
+
+		// These platform APIs only exist on a TV / Simulator, so the page still renders in a desktop browser
+		if (window.webOS) {
+			webOS.deviceInfo(function (info) {
+				document.getElementById("device").textContent =
+					info.modelName + " · firmware " + info.version + " · SDK " + info.sdkVersion;
+			});
+
+			// Luna Service (LS2) call: the way web apps talk to TV system services
+			webOS.service.request("luna://com.palm.systemservice", {
+				method: "time/getSystemTime",
+				parameters: {},
+				onSuccess: function (res) {
+					document.getElementById("clock").textContent = new Date(res.utc * 1000).toISOString();
+				},
+				onFailure: function (err) {
+					document.getElementById("clock").textContent = "failed: " + err.errorText;
+				}
+			});
+		} else {
+			document.getElementById("device").textContent = "not on webOS (desktop browser)";
+			document.getElementById("clock").textContent = "n/a";
+		}
+	</script>
+</body>
+
+</html>
