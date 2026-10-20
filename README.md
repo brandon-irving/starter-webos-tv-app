@@ -21,8 +21,9 @@ dist/                built .ipk packages (gitignored)
 npm run setup:cli                          # installs @webos-tools/cli globally if missing
 npm run new -- ../my-app com.me.myapp "My App"   # make a copy with a new app ID
 cd ../my-app
-npm run pair -- 192.168.1.50 AB12CD        # TV IP + passphrase from the Developer Mode app
-npm run deploy                             # package, install and launch on the TV
+cp .env.example .env                       # add TV_IP + TV_PASSPHRASE from the Developer Mode app
+npm run tv                                 # pairs if needed, then packages, installs and launches
+npm run tv:dev                             # live reload on the TV while you edit app/
 ```
 
 ## Claude Code skills
@@ -52,10 +53,11 @@ For example, "set up my LG TV for development" or "make a new TV app called Weat
 
 | Command | What it does |
 |---|---|
+| `npm run tv` | One command: installs the CLI if missing, pairs using `.env` if needed, then packages, installs and launches |
+| `npm run tv:dev` (or `dev`) | Live reload on the TV: serves `app/` from your machine and reloads the TV on every save. Ctrl+C stops |
 | `npm run doctor` | Checks the CLI, the manifest, the device registration, TV reachability and SSH auth |
 | `npm run pair -- <IP> <PASS> [name]` | Registers the TV, downloads its SSH key and makes it the default device |
 | `npm run deploy` | Packages, installs and launches the app |
-| `npm run dev` | Runs `app/` from your machine without installing; reloads on save |
 | `npm run inspect` | Opens Chrome DevTools connected to the app running on the TV |
 | `npm run launch` / `close` / `uninstall` / `list` | App lifecycle on the TV |
 | `npm run tv-info` | Model, SDK and firmware |
@@ -68,6 +70,7 @@ The scripts use the device named `tv`. To target another TV, set `WEBOS_DEVICE=b
 - **`ares-setup-device -i "ip=..."` silently saves 127.0.0.1.** The option is `host=`. `pair-tv.sh` uses `host`.
 - **`ares-novacom --getkey` fails with "Failed to get ssh private key".** Key Server is off. It serves the key on port 9991, and `pair` checks that port first.
 - **"All configured authentication methods failed" after getkey.** The passphrase prompt doesn't read piped input, so the passphrase never got saved. `pair` writes `passphrase=` into the device entry directly.
+- **`ares-launch --hosted` (LG's no-install mode) breaks the Back key.** It loads your app in an iframe inside LG's generic `com.sdk.ares.hostedapp`, whose manifest lacks `disableBackHistoryAPI`, so Back and launch params never reach your app. It also relaunches the whole app on every file event. `tv:dev` instead installs a `<id>.dev` shell that carries your own manifest and sends its whole window to `scripts/dev-server.mjs`, a dependency-free server with live reload. Remove the shell with `ares-install -d tv -r <id>.dev`.
 - **The TV's IP changed.** Give the TV a fixed IP (DHCP reservation) in your router, or run `pair` again with the new IP.
 - **Node version.** LG recommends Node 14–16; CLI 3.x works on 25. Under nvm, global packages are per Node version, so switching versions means running `setup:cli` again.
 

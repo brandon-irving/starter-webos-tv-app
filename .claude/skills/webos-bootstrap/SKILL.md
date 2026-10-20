@@ -31,7 +31,7 @@ This repo (`starter-webos-tv-app`) is the template: a known-good app plus script
    ```
    You should see `Success` and `dist/<id>_0.0.1_all.ipk`. A `requiredACG` warning means appinfo lost its `requiredACG` array.
 
-5. **Check the device.** Run `npm run doctor`. If no TV is paired, or the device points at 127.0.0.1, hand off to the **webos-tv-setup** skill. If it's paired, run `npm run deploy` and ask the user to confirm what they see on the TV.
+5. **Check the device.** Run `npm run doctor`. If no TV is paired, or the device points at 127.0.0.1, hand off to the **webos-tv-setup** skill. If it's paired, run `npm run deploy` (or `npm run tv`, which also pairs from `.env` when needed) and ask the user to confirm what they see on the TV. For iterating, suggest `npm run tv:dev` (live reload).
 
 ## Notes
 

@@ -11,15 +11,18 @@ Run these from a project made from `starter-webos-tv-app` (it has `app/` and `sc
 
 | Goal | Command |
 |---|---|
-| Full install and launch | `npm run deploy` |
-| Fast iteration, no install, reloads on save | `npm run dev` (long-running; start it in the background) |
+| Pair if needed, then install and launch (reads `.env`) | `npm run tv` |
+| Full install and launch on an already-paired TV | `npm run deploy` |
+| Live reload on the TV while editing `app/` | `npm run tv:dev` (long-running; start it in the background). It installs a `<id>.dev` app next to the real one; remove it with `ares-install -d tv -r <id>.dev` |
 | DevTools for the app on the TV | `npm run inspect` (opens a Chrome DevTools URL) |
 | Close / uninstall / list apps | `npm run close` / `uninstall` / `list` |
 | TV model and SDK | `npm run tv-info` |
 
 Before each `deploy` for a release, bump `version` in `app/appinfo.json`. The .ipk name comes from id and version.
 
-After a deploy, you can't see the TV. Ask the user to confirm what's on screen, or use `npm run inspect` to read console errors.
+After a deploy, you can't see the TV. Ask the user to confirm what's on screen, or use `npm run inspect` to read console errors. With `tv:dev`, the dev server logs `client connected (<TV IP>)` when the TV has loaded the page, and logs each reload.
+
+Don't use `ares-launch --hosted`: it wraps the app in an iframe inside LG's generic hosted app, so the Back key and launch params never reach it.
 
 ## Writing TV app code
 

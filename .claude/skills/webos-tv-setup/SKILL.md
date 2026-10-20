@@ -26,6 +26,8 @@ cd <this repo, or a project created from it>
 npm run pair -- <TV_IP> <PASSPHRASE> [device-name, default "tv"]
 ```
 
+Or put `TV_IP` and `TV_PASSPHRASE` in `.env` (copy `.env.example`) and run `npm run tv`: it pairs only when needed, then installs and launches.
+
 `scripts/pair-tv.sh` checks ports 9922 and 9991 first, adds or updates the device, downloads the key, stores the passphrase, makes it the default device and runs `ares-device -i`. Success prints modelName / sdkVersion / firmwareVersion. Then tell the user they can turn Key Server off.
 
 ## Troubleshooting (all seen on a real TV)

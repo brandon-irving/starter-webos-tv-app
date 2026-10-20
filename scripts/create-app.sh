@@ -20,7 +20,7 @@ done
 
 [[ ! -e "$TARGET" ]] || { echo "Target '$TARGET' already exists" >&2; exit 1; }
 
-rsync -a --exclude .git --exclude dist --exclude node_modules --exclude .DS_Store "$TEMPLATE/" "$TARGET/"
+rsync -a --exclude .git --exclude dist --exclude node_modules --exclude .DS_Store --exclude .env "$TEMPLATE/" "$TARGET/"
 
 ID="$ID" TITLE="$TITLE" NAME="$(basename "$TARGET")" node -e '
 const fs = require("fs"), path = require("path"), dir = process.argv[1];
