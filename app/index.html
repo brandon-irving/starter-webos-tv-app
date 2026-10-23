@@ -4,115 +4,109 @@
 <head>
 	<meta charset="utf-8">
 	<title>Starter</title>
-	<style>
-		* { box-sizing: border-box; }
-		html, body { margin: 0; width: 100%; height: 100%; }
-		body {
-			background: #14161a;
-			color: #f2f2f2;
-			font-family: "LG Smart UI", Arial, sans-serif;
-			/* TV overscan safe area: keep content ~5% from the edges */
-			padding: 54px 96px;
-		}
-		h1 { font-size: 64px; margin: 0 0 8px; }
-		.sub { font-size: 28px; color: #9aa0a6; margin-bottom: 48px; }
-		.row { display: flex; gap: 32px; margin-bottom: 48px; }
-		.tile {
-			width: 320px; height: 180px; border-radius: 16px;
-			background: #262a31; font-size: 32px;
-			display: flex; align-items: center; justify-content: center;
-			border: 4px solid transparent; transition: transform 120ms, border-color 120ms;
-		}
-		/* Focus must be obvious from 3 metres away */
-		.tile.focused { border-color: #e6007e; transform: scale(1.08); background: #333842; }
-		.panel { font-size: 26px; line-height: 1.6; color: #c8ccd2; }
-		.panel b { color: #fff; }
-	</style>
+	<link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
 	<h1>webOS Starter</h1>
-	<div class="sub">Use the arrow keys and OK on the remote. Back exits.</div>
+	<div class="sub">D-pad, Magic Remote pointer or a gamepad. OK selects, Back closes or exits.</div>
 
-	<div class="row" id="tiles">
-		<div class="tile">Movies</div>
-		<div class="tile">Shows</div>
-		<div class="tile">Music</div>
-		<div class="tile">Settings</div>
+	<div class="row" id="actions">
+		<div class="tile">In-app toast</div>
+		<div class="tile">System toast</div>
+		<div class="tile">Open overlay</div>
+		<div class="tile" id="yt">Open YouTube</div>
+	</div>
+
+	<h2>Scrolling row</h2>
+	<div class="viewport">
+		<div class="track" id="track"></div>
 	</div>
 
 	<div class="panel">
-		<div>Last key: <b id="lastKey">none</b></div>
-		<div>Selected: <b id="selected">none</b></div>
+		<div>Last input: <b id="last">none</b></div>
 		<div>Device: <b id="device">loading…</b></div>
 		<div>TV clock (UTC): <b id="clock">loading…</b></div>
-		<div>Resolution: <b id="res"></b></div>
+		<div class="keys">Color keys:<span style="background:#e53935"></span>red<span style="background:#43a047"></span>green<span style="background:#fdd835"></span>yellow<span style="background:#1e88e5"></span>blue</div>
+	</div>
+
+	<div class="overlay" id="overlay">
+		<div class="dialog">
+			<h1>An overlay</h1>
+			<p>Focus is trapped here: the tiles behind can't be reached. Back or "Close" pops this layer and focus returns where it was.</p>
+			<div class="row">
+				<div class="tile small" id="ov-close">Close</div>
+				<div class="tile small" id="ov-toast">Toast</div>
+			</div>
+		</div>
 	</div>
 
 	<script src="webOSTVjs-1.2.13/webOSTV.js" charset="utf-8"></script>
 	<script src="webOSTVjs-1.2.13/webOSTV-dev.js" charset="utf-8"></script>
+	<script src="js/tv.js"></script>
 	<script>
-		var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, ENTER: 13, BACK: 461 };
-		var tiles = document.querySelectorAll(".tile");
-		var focusIndex = 0;
+		(function () {
+			var $ = TV.$;
 
-		function setFocus(i) {
-			tiles[focusIndex].classList.remove("focused");
-			focusIndex = (i + tiles.length) % tiles.length;
-			tiles[focusIndex].classList.add("focused");
-		}
-		setFocus(0);
+			// Scrolling row content
+			var track = $("#track");
+			for (var i = 1; i <= 12; i++) track.appendChild(TV.el("div", "tile small", "Item " + i));
 
-		// Magic Remote pointer: hovering a tile moves focus to it
-		Array.prototype.forEach.call(tiles, function (tile, i) {
-			tile.addEventListener("mouseover", function () { setFocus(i); });
-			tile.addEventListener("click", function () { select(); });
-		});
+			// Each focusable element gets an _select handler (runs on OK, Enter or click)
+			var actions = Array.prototype.slice.call($("#actions").children);
+			actions[0]._select = function () { TV.toast("Hello from TV.toast"); };
+			actions[1]._select = function () {
+				TV.systemToast("Hello from the TV's system toast").catch(function (e) { TV.toast("System toast: " + e.message); });
+			};
+			actions[2]._select = openOverlay;
+			actions[3]._select = function () {
+				TV.appInstalled("youtube.leanback.v4").then(function (yes) {
+					if (yes) TV.launchApp("youtube.leanback.v4");
+					else TV.toast(TV.onWebOS ? "YouTube isn't installed" : "Only works on the TV");
+				});
+			};
+			var items = Array.prototype.slice.call(track.children);
+			items.forEach(function (el) { el._select = function () { TV.toast(el.textContent + " selected"); }; });
 
-		function select() {
-			document.getElementById("selected").textContent = tiles[focusIndex].textContent;
-		}
+			// The base layer: two rows. With no onBack, Back on this layer exits the app (TV.exit).
+			TV.nav.push({ rows: [{ items: actions }, { items: items, track: track, viewport: track.parentNode }] });
 
-		document.addEventListener("keydown", function (e) {
-			document.getElementById("lastKey").textContent = e.keyCode + (e.key ? " (" + e.key + ")" : "");
-			switch (e.keyCode) {
-				case KEY.LEFT: setFocus(focusIndex - 1); break;
-				case KEY.RIGHT: setFocus(focusIndex + 1); break;
-				case KEY.ENTER: select(); break;
-				case KEY.BACK:
-					// Delivered because disableBackHistoryAPI=true in appinfo.json.
-					// platformBack() hands control back to the TV (exits to launcher).
-					if (window.webOS && webOS.platformBack) webOS.platformBack();
-					break;
-				default: return;
+			function openOverlay() {
+				var ov = $("#overlay");
+				ov.classList.add("open");
+				$("#ov-close")._select = function () { TV.nav.pop(); };
+				$("#ov-toast")._select = function () { TV.toast("Toast from inside the overlay"); };
+				TV.nav.push({
+					rows: [{ items: [$("#ov-close"), $("#ov-toast")] }],
+					onClose: function () { ov.classList.remove("open"); }
+				});
 			}
-			e.preventDefault();
-		});
 
-		document.getElementById("res").textContent = window.innerWidth + "x" + window.innerHeight;
-
-		// These platform APIs only exist on a TV / Simulator, so the page still renders in a desktop browser
-		if (window.webOS) {
-			webOS.deviceInfo(function (info) {
-				document.getElementById("device").textContent =
-					info.modelName + " · firmware " + info.version + " · SDK " + info.sdkVersion;
-			});
-
-			// Luna Service (LS2) call: the way web apps talk to TV system services
-			webOS.service.request("luna://com.palm.systemservice", {
-				method: "time/getSystemTime",
-				parameters: {},
-				onSuccess: function (res) {
-					document.getElementById("clock").textContent = new Date(res.utc * 1000).toISOString();
-				},
-				onFailure: function (err) {
-					document.getElementById("clock").textContent = "failed: " + err.errorText;
+			// See every action first (return true to consume it)
+			TV.onInput = function (action) {
+				$("#last").textContent = action;
+				if (action === "red" || action === "green" || action === "yellow" || action === "blue") {
+					TV.toast(action + " key");
+					return true;
 				}
-			});
-		} else {
-			document.getElementById("device").textContent = "not on webOS (desktop browser)";
-			document.getElementById("clock").textContent = "n/a";
-		}
+			};
+
+			TV.idle(2 * 60 * 1000, function () { TV.toast("Idle for 2 minutes (TV.idle)"); });
+
+			if (TV.onWebOS) {
+				TV.deviceInfo().then(function (info) {
+					$("#device").textContent = info.modelName + " · firmware " + info.version + " · SDK " + info.sdkVersion;
+				});
+				// ACG time.query
+				TV.luna("com.palm.systemservice", "time/getSystemTime").then(
+					function (res) { $("#clock").textContent = new Date(res.utc * 1000).toISOString(); },
+					function (err) { $("#clock").textContent = "failed: " + err.message; }
+				);
+			} else {
+				$("#device").textContent = "not on webOS (desktop browser)";
+				$("#clock").textContent = "n/a";
+			}
+		})();
 	</script>
 </body>
 

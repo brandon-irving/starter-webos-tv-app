@@ -9,9 +9,12 @@ Verified on an LG 65NU700BPUA (webOS SDK 11.2) with webOS CLI 3.2.6 on Node 25, 
 ```
 app/                 the webOS app (this folder is what gets packaged)
   appinfo.json       manifest: id, version, title, icons, ACG permissions
-  index.html         starter UI: D-pad focus, Back key, device info, Luna call
+  index.html         demo UI: two focus rows (one scrolls), an overlay, toasts, app launch, device info
+  styles.css
+  js/tv.js           focus, input (remote, pointer, gamepad), Luna helpers, toasts, idle
   webOSTVjs-1.2.13/  LG's webOSTV.js library (webOS.service, deviceInfo, platformBack)
-scripts/             bash helpers behind the npm scripts
+scripts/             helpers behind the npm scripts (cdp.mjs: shot/eval/key/logs)
+docs/                performance.md and platform.md: what we learned on a real TV
 dist/                built .ipk packages (gitignored)
 ```
 
@@ -59,6 +62,10 @@ For example, "set up my LG TV for development" or "make a new TV app called Weat
 | `npm run pair -- <IP> <PASS> [name]` | Registers the TV, downloads its SSH key and makes it the default device |
 | `npm run deploy` | Packages, installs and launches the app |
 | `npm run inspect` | Opens Chrome DevTools connected to the app running on the TV |
+| `npm run shot [-- out.jpg]` | Screenshot of the app on the TV (default `dist/shot.jpg`) |
+| `npm run eval -- '<js>'` | Runs JS in the app on the TV and prints the result as JSON |
+| `npm run key -- down ok back` | Sends remote keys to the app (arrows, ok, back, color keys, media keys) |
+| `npm run logs [-- 10]` | Prints the app's console output for N seconds |
 | `npm run launch` / `close` / `uninstall` / `list` | App lifecycle on the TV |
 | `npm run tv-info` | Model, SDK and firmware |
 | `npm run sim` | Runs the app in the webOS TV Simulator (download it separately from LG; set `WEBOS_SIM_VERSION`) |
@@ -76,12 +83,26 @@ The scripts use the device named `tv`. To target another TV, set `WEBOS_DEVICE=b
 
 ## Building on the app
 
+`app/js/tv.js` handles the TV-specific plumbing; `index.html` shows each part in use.
+
+```js
+// Rows of focusable elements. OK, Enter or a click runs el._select.
+tile._select = function () { TV.toast("Selected"); };
+TV.nav.push({ rows: [{ items: tiles }, { items: more, track: trackEl, viewport: viewportEl }] });
+TV.nav.push({ rows: [{ items: dialogButtons }], onClose: hideDialog }); // overlay: traps focus, Back pops it
+
+TV.onInput = function (action) { if (action === "red") { /* ... */ return true; } }; // see every input first
+TV.luna("com.palm.systemservice", "time/getSystemTime").then(...);                 // luna:// as a promise
+TV.appInstalled("netflix").then(function (yes) { if (yes) TV.launchApp("netflix"); });
+TV.idle(5 * 60 * 1000, startScreensaver);
+```
+
+- **Input:** D-pad, the Magic Remote pointer (hover focuses, click selects) and Bluetooth gamepads (Cross/A = OK, Circle/B = Back) all arrive as the same actions. Back closes the top overlay, then calls `onBack` or exits the app.
 - **Resolution:** web apps render at 1920×1080. 4K isn't supported for web apps; the TV scales up.
 - **Overscan:** keep content about 5% in from the screen edges (the body has 54px/96px padding).
-- **Remote keys:** Left 37, Up 38, Right 39, Down 40, OK 13, Back 461. With `disableBackHistoryAPI: true` the app receives Back itself; call `webOS.platformBack()` to exit.
-- **Magic Remote** also works as a mouse pointer, so handle `mouseover`/`click` as well as keys.
-- **Luna Service calls** (`webOS.service.request("luna://...")`) need the matching group in `requiredACG`. Look it up in the [ACG guide](https://webostv.developer.lge.com/develop/guides/acg-guide). `ares-package` warns when `requiredACG` is missing.
-- `index.html` checks for `window.webOS`, so the page also opens in a desktop browser for quick UI work.
+- **Luna Service calls** need the matching group in `requiredACG`. Look it up in the [ACG guide](https://webostv.developer.lge.com/develop/guides/acg-guide). `ares-package` warns when `requiredACG` is missing.
+- The page also opens in a desktop browser for quick UI work (`TV.onWebOS` is false there; Esc/Backspace act as Back).
+- **Before building something big, read [`docs/performance.md`](docs/performance.md)** (what's slow on a TV and what to do instead) and [`docs/platform.md`](docs/platform.md) (keys, permissions, what apps can and can't do).
 
 ## Docs
 
