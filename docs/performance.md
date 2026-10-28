@@ -15,7 +15,7 @@ Check every change on the TV: `npm run deploy`, then `npm run shot` and `npm run
 
 ## Memory (about 1 GB, shared with the TV's own UI)
 
-- **Downscale images to 1920 px before they reach the TV.** Large photos cost memory to decode, and the screen is 1920×1080 anyway (web apps never render at 4K).
+- **Downscale images to the app's resolution before they reach the TV.** Large photos cost memory to decode, and web app graphics never render above 1920×1080 (UHD models) or 1280×720 (Full HD models), even though video can play at 4K.
 - **Release what's off screen.** Set `img.src = ""` on hidden slides and drop big arrays when a screen closes. The TV kills apps that use too much memory without telling you.
 - **Run one animation loop at a time.** Stop timers and `requestAnimationFrame` loops for screens that aren't visible.
 

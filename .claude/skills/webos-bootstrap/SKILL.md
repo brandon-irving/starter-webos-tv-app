@@ -13,7 +13,7 @@ This repo (`starter-webos-tv-app`) is the template: a known-good app plus script
    ```bash
    cd <template> && npm run setup:cli
    ```
-   This installs `@webos-tools/cli` globally if `ares` is missing. LG recommends Node 14–16, but CLI 3.x is verified on Node 25. Under nvm, global packages are per Node version: if `ares` disappears after a `nvm use`, run this again.
+   This installs `@webos-tools/cli` globally if `ares` is missing. The scripts need Node 22+ (`engines`); `.nvmrc` pins 24 LTS (`nvm install`). LG's docs still list Node 14–16, which are end-of-life; CLI 3.2.6 is validated on 22, 24 and 25. Under nvm, global packages are per Node version: if `ares` disappears after a `nvm use`, run this again.
 
 2. **Pick the app ID and title.** Ask the user if they didn't say. Rules (the script enforces them):
    - lowercase reverse-domain, e.g. `com.<name>.<app>`

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
 	<meta charset="utf-8">
@@ -8,17 +8,18 @@
 </head>
 
 <body>
+	<!-- A 1920×1080 layout (UHD TVs). Full HD TVs render web apps at 1280×720: see "Resolution" in the README. -->
 	<h1>webOS Starter</h1>
 	<div class="sub">D-pad, Magic Remote pointer or a gamepad. OK selects, Back closes or exits.</div>
 
 	<div class="row" id="actions">
-		<div class="tile">In-app toast</div>
-		<div class="tile">System toast</div>
-		<div class="tile">Open overlay</div>
-		<div class="tile" id="yt">Open YouTube</div>
+		<button class="tile" type="button">In-app toast</button>
+		<button class="tile" type="button">Open overlay</button>
+		<button class="tile" type="button" id="yt">Open YouTube</button>
 	</div>
 
-	<h2>Scrolling row</h2>
+	<h2><label for="search">Scrolling row: select the field to filter it with the TV keyboard</label></h2>
+	<input class="search" id="search" type="search" placeholder="Filter items…" autocomplete="off">
 	<div class="viewport">
 		<div class="track" id="track"></div>
 	</div>
@@ -30,13 +31,13 @@
 		<div class="keys">Color keys:<span style="background:#e53935"></span>red<span style="background:#43a047"></span>green<span style="background:#fdd835"></span>yellow<span style="background:#1e88e5"></span>blue</div>
 	</div>
 
-	<div class="overlay" id="overlay">
+	<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="ov-title" hidden>
 		<div class="dialog">
-			<h1>An overlay</h1>
+			<h1 id="ov-title">An overlay</h1>
 			<p>Focus is trapped here: the tiles behind can't be reached. Back or "Close" pops this layer and focus returns where it was.</p>
 			<div class="row">
-				<div class="tile small" id="ov-close">Close</div>
-				<div class="tile small" id="ov-toast">Toast</div>
+				<button class="tile small" type="button" id="ov-close">Close</button>
+				<button class="tile small" type="button" id="ov-toast">Toast</button>
 			</div>
 		</div>
 	</div>
@@ -50,35 +51,53 @@
 
 			// Scrolling row content
 			var track = $("#track");
-			for (var i = 1; i <= 12; i++) track.appendChild(TV.el("div", "tile small", "Item " + i));
+			var allItems = [];
+			for (var i = 1; i <= 12; i++) {
+				var item = TV.el("button", "tile small", "Item " + i);
+				item.type = "button";
+				item._select = function () { TV.toast(this.textContent + " selected"); };
+				track.appendChild(item);
+				allItems.push(item);
+			}
 
 			// Each focusable element gets an _select handler (runs on OK, Enter or click)
 			var actions = Array.prototype.slice.call($("#actions").children);
 			actions[0]._select = function () { TV.toast("Hello from TV.toast"); };
-			actions[1]._select = function () {
-				TV.systemToast("Hello from the TV's system toast").catch(function (e) { TV.toast("System toast: " + e.message); });
+			actions[1]._select = openOverlay;
+			actions[2]._select = function () {
+				if (!TV.onWebOS) return TV.toast("Only works on the TV");
+				TV.appInstalled("youtube.leanback.v4").then(
+					function (yes) { if (yes) TV.launchApp("youtube.leanback.v4"); else TV.toast("YouTube isn't installed"); },
+					function (err) { TV.toast("Couldn't check for YouTube: " + err.message); }
+				);
 			};
-			actions[2]._select = openOverlay;
-			actions[3]._select = function () {
-				TV.appInstalled("youtube.leanback.v4").then(function (yes) {
-					if (yes) TV.launchApp("youtube.leanback.v4");
-					else TV.toast(TV.onWebOS ? "YouTube isn't installed" : "Only works on the TV");
-				});
-			};
-			var items = Array.prototype.slice.call(track.children);
-			items.forEach(function (el) { el._select = function () { TV.toast(el.textContent + " selected"); }; });
 
-			// The base layer: two rows. With no onBack, Back on this layer exits the app (TV.exit).
-			TV.nav.push({ rows: [{ items: actions }, { items: items, track: track, viewport: track.parentNode }] });
+			// The base layer: actions, the search field (no _select: selecting it starts editing), the scrolling row.
+			// With no onBack, Back on this layer exits the app (TV.exit).
+			var search = $("#search");
+			var base = { rows: rowsFor(allItems) };
+			TV.nav.push(base);
+			function rowsFor(items) {
+				return [{ items: actions }, { items: [search] }, { items: items, track: track, viewport: track.parentNode }];
+			}
+
+			// Filtering swaps the row's items with TV.nav.update, which keeps focus on the same element when it can
+			search.addEventListener("input", function () {
+				var q = search.value.trim().toLowerCase();
+				var shown = allItems.filter(function (el) { return el.textContent.toLowerCase().indexOf(q) >= 0; });
+				allItems.forEach(function (el) { el.hidden = shown.indexOf(el) < 0; });
+				track.style.transform = "";
+				TV.nav.update(base, rowsFor(shown));
+			});
 
 			function openOverlay() {
 				var ov = $("#overlay");
-				ov.classList.add("open");
+				ov.hidden = false;
 				$("#ov-close")._select = function () { TV.nav.pop(); };
 				$("#ov-toast")._select = function () { TV.toast("Toast from inside the overlay"); };
 				TV.nav.push({
 					rows: [{ items: [$("#ov-close"), $("#ov-toast")] }],
-					onClose: function () { ov.classList.remove("open"); }
+					onClose: function () { ov.hidden = true; }
 				});
 			}
 

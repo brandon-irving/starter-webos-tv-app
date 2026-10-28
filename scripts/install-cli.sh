@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
 # Install the webOS CLI (@webos-tools/cli) globally if it is missing.
+ALLOW_BAD_MANIFEST=1 # installing the CLI doesn't need a valid app
 source "$(dirname "$0")/lib.sh"
 
-command -v node >/dev/null 2>&1 || die "Node.js is required. Install it (nvm recommended) and re-run."
-
+# One Node policy for every script: the minimum is package.json "engines", the tested LTS is .nvmrc.
+# (LG's docs still list Node 14-16 for the CLI; those releases are end-of-life.)
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if (( NODE_MAJOR < 14 )); then
-  die "Node $(node -v) is too old; the webOS CLI needs Node 14+."
-fi
-# LG recommends Node 14-16, but CLI 3.x is verified working on Node 25.
-if (( NODE_MAJOR > 16 )); then
-  warn "Node $(node -v) is newer than LG's recommended 14-16. CLI 3.x works on 25; if it misbehaves: nvm use 16 && npm run setup:cli"
+if (( NODE_MAJOR < NODE_MIN )); then
+  die "Node $(node -v) is too old; these scripts need Node $NODE_MIN+. Run: nvm install (uses .nvmrc)"
 fi
 
 if command -v ares >/dev/null 2>&1; then

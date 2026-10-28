@@ -2,6 +2,9 @@
   "name": "starter-webos-tv-app",
   "private": true,
   "description": "Starter template for LG webOS TV web apps",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "tv": "bash scripts/tv-up.sh",
     "tv:dev": "bash scripts/tv-up.sh --dev",
@@ -9,7 +12,7 @@
     "setup:cli": "bash scripts/install-cli.sh",
     "pair": "bash scripts/pair-tv.sh",
     "doctor": "bash scripts/doctor.sh",
-    "new": "bash scripts/create-app.sh",
+    "new": "node scripts/create-app.mjs",
     "deploy": "bash scripts/deploy.sh",
     "package": "bash scripts/tv.sh package",
     "install-tv": "bash scripts/tv.sh install",
@@ -23,6 +26,10 @@
     "uninstall": "bash scripts/tv.sh uninstall",
     "list": "bash scripts/tv.sh list",
     "tv-info": "bash scripts/tv.sh info",
-    "sim": "bash scripts/tv.sh sim"
+    "sim": "bash scripts/tv.sh sim",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
   }
 }

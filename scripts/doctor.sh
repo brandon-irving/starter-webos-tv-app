@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 # Health check: tooling, app manifest, device registration and TV reachability.
+ALLOW_BAD_MANIFEST=1
 source "$(dirname "$0")/lib.sh"
 
 ok=1
 check() { if eval "$2" >/dev/null 2>&1; then say "ok    $1"; else warn "FAIL  $1  ->  $3"; ok=0; fi; }
 
-check "node installed ($(node -v 2>/dev/null))" "command -v node" "install Node.js"
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+check "node $(node -v) (needs $NODE_MIN+)" "(( NODE_MAJOR >= NODE_MIN ))" "install the LTS version in .nvmrc (nvm install)"
 check "webOS CLI installed" "command -v ares" "npm run setup:cli"
-check "app/appinfo.json valid ($APP_ID $APP_VERSION)" "node -e \"require('$APP_DIR/appinfo.json')\"" "fix JSON syntax"
+if [[ -n "$MANIFEST_ERROR" ]]; then
+  warn "FAIL  app/appinfo.json  ->  fix the following:"
+  printf '%s\n' "$MANIFEST_ERROR" >&2
+  ok=0
+else
+  say "ok    app/appinfo.json ($APP_ID $APP_VERSION)"
+fi
 
 if command -v ares >/dev/null 2>&1; then
   if device_exists "$DEVICE"; then

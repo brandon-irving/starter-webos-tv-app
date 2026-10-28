@@ -1,34 +1,42 @@
 #!/usr/bin/env bash
 # One command from zero to the app running on the TV, driven by .env:
 #
-#   npm run tv        install CLI if missing, pair if needed, package, install, launch
-#   npm run tv:dev    live reload: serves app/ from this machine and installs a small
-#                     "<Title> (dev)" shell that loads it; saving a file reloads the TV
+#   npm run tv                  install CLI if missing, pair if needed, package, install, launch
+#   npm run tv:dev              live reload: serves app/ from this machine and installs a small
+#                               "<Title> (dev)" shell (<id>.dev) that loads it; saving a file reloads the TV
+#   npm run tv -- --config      print the settings these would use, and stop
 #
-# .env needs TV_IP and TV_PASSPHRASE (from the TV's Developer Mode app).
+# Settings (environment > .env > default): TV_IP, TV_PASSPHRASE, DEV_PORT, HOST_IP, WEBOS_DEVICE.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-DEV=0
+DEV=0 CONFIG=0
 for arg in "$@"; do
   case "$arg" in
     --dev) DEV=1 ;;
-    *) echo "Unknown option: $arg (use --dev)" >&2; exit 1 ;;
+    --config) CONFIG=1 ;;
+    *) echo "Unknown option: $arg (use --dev, --config)" >&2; exit 1 ;;
   esac
 done
 
 source scripts/lib.sh
 
-# Read KEY=VALUE from .env without executing it; strips optional quotes
-env_get() {
-  [[ -f .env ]] || return 0
-  sed -nE "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*['\"]?([^'\"]*)['\"]?[[:space:]]*$/\1/p" .env | tail -1
-}
+# HOST_IP: this machine's address as the TV sees it (the TV loads the dev server from it)
+if (( DEV )) && [[ -z "$HOST_IP" && -n "$TV_IP" ]]; then
+  HOST_IP="$(node scripts/sh-bridge.mjs host-ip "$TV_IP" 2>/dev/null || true)"
+fi
+URL="http://${HOST_IP:-?}:$DEV_PORT/"
 
-TV_IP="${TV_IP:-$(env_get TV_IP)}"
-TV_PASSPHRASE="${TV_PASSPHRASE:-$(env_get TV_PASSPHRASE)}"
-DEV_PORT="${DEV_PORT:-5500}"
+if (( CONFIG )); then
+  echo "app        $APP_ID $APP_VERSION (dev shell: $DEV_ID)"
+  echo "device     $DEVICE"
+  echo "TV_IP      ${TV_IP:-(not set)}"
+  echo "passphrase $([[ -n "$TV_PASSPHRASE" ]] && echo set || echo '(not set)')"
+  (( DEV )) && echo "dev server $URL"
+  exit 0
+fi
+
 [[ -n "$TV_IP" ]] || die "TV_IP is not set. Copy .env.example to .env and fill it in."
 
 # 1. CLI
@@ -52,42 +60,23 @@ fi
 # whose manifest lacks disableBackHistoryAPI, so the Back key and launch params never reach the
 # app. Instead, install a shell with this app's own manifest (under a separate .dev id, next to
 # the real app) that hands its whole window to the dev server on this machine.
-IFACE="$(route -n get "$TV_IP" 2>/dev/null | awk '/interface:/ {print $2}')"
-LAN_IP="$(ipconfig getifaddr "${IFACE:-en0}" 2>/dev/null || true)"
-[[ -n "$LAN_IP" ]] || die "Couldn't work out this machine's IP on the TV's network"
-URL="http://$LAN_IP:$DEV_PORT/"
+# Live reload runs over http://, not file://: test the packaged app (npm run deploy) before you
+# rely on cookies, storage or network behavior (see "Live reload vs. the packaged app" in the README).
+[[ -n "$HOST_IP" ]] || die "Couldn't work out this machine's IP on the TV's network. Set HOST_IP in .env."
 
 say "Serving app/ at $URL"
 node scripts/dev-server.mjs "$DEV_PORT" &
 SERVER_PID=$!
 trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
 for _ in $(seq 1 40); do curl -s -o /dev/null "$URL" && break; sleep 0.25; done
-curl -s -o /dev/null "$URL" || die "Dev server didn't come up on port $DEV_PORT"
+curl -s -o /dev/null "$URL" || die "Dev server didn't come up at $URL (port in use? set DEV_PORT; wrong address? set HOST_IP)"
 
 SHELL_DIR="$DIST_DIR/devshell"
-rm -rf "$SHELL_DIR" && mkdir -p "$SHELL_DIR"
-node -e '
-  const fs = require("fs"), path = require("path");
-  const [appDir, out, url] = process.argv.slice(1);
-  const info = JSON.parse(fs.readFileSync(path.join(appDir, "appinfo.json"), "utf8"));
-  for (const k of ["icon", "largeIcon"]) if (info[k]) fs.copyFileSync(path.join(appDir, info[k]), path.join(out, path.basename(info[k])));
-  info.id += ".dev";
-  info.title += " (dev)";
-  fs.writeFileSync(path.join(out, "appinfo.json"), JSON.stringify(info, null, 2));
-  // Retries until the dev server answers, then navigates the whole window to it (no iframe)
-  fs.writeFileSync(path.join(out, "index.html"), `<!DOCTYPE html><html><body style="background:#000;color:#888;font:28px sans-serif;padding:96px">
-Waiting for the dev server at ${url}…<br>Run <b>npm run tv:dev</b> on your machine.
-<script>
-  var url = ${JSON.stringify(url)};
-  function go() { fetch(url, { mode: "no-cors" }).then(function () { location.replace(url); }, function () { setTimeout(go, 2000); }); }
-  go();
-</script></body></html>`);
-' "$APP_DIR" "$SHELL_DIR" "$URL"
-
-DEV_ID="$APP_ID.dev"
+node scripts/sh-bridge.mjs dev-shell "$SHELL_DIR" "$URL" >/dev/null
 ares-package "$SHELL_DIR" -o "$DIST_DIR" >/dev/null
 say "Installing $DEV_ID on '$DEVICE'"
 ares-install -d "$DEVICE" "$DIST_DIR/${DEV_ID}_${APP_VERSION}_all.ipk"
 ares-launch -d "$DEVICE" "$DEV_ID"
 say "Running on the TV with live reload. Edit app/ and save. Ctrl+C to stop."
+say "Inspect it with the --dev flag: npm run shot -- --dev, npm run logs -- --dev, npm run inspect -- --dev"
 wait "$SERVER_PID"

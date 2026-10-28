@@ -1,4 +1,7 @@
+/* A 1920×1080 layout, for UHD TVs. Full HD TVs render web apps at 1280×720 (see "Resolution" in the README).
+   CSS here sticks to what Chromium 87 (webOS TV 22) supports. */
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
 body {
 	background: #14161a;
@@ -11,6 +14,9 @@ h1 { font-size: 64px; margin: 0 0 8px; }
 h2 { font-size: 30px; font-weight: 600; color: #9aa0a6; margin: 0 0 16px; }
 .sub { font-size: 28px; color: #9aa0a6; margin-bottom: 40px; }
 
+/* tv.js gives the focused item browser focus too; the .focused style is the visible indicator */
+:focus { outline: none; }
+
 .row { display: flex; gap: 32px; margin-bottom: 40px; }
 /* Horizontal scrolling row: tv.js slides .track inside .viewport to keep focus in view */
 .viewport { overflow: hidden; margin: -16px; padding: 16px; margin-bottom: 24px; }
@@ -18,13 +24,24 @@ h2 { font-size: 30px; font-weight: 600; color: #9aa0a6; margin: 0 0 16px; }
 
 .tile {
 	flex: none; width: 320px; height: 160px; border-radius: 16px;
-	background: #262a31; font-size: 30px; text-align: center; padding: 0 16px;
+	background: #262a31; color: inherit; font: inherit; font-size: 30px; text-align: center; padding: 0 16px;
 	display: flex; align-items: center; justify-content: center;
 	border: 4px solid transparent; transition: transform 120ms, border-color 120ms;
 }
 .tile.small { width: 220px; height: 124px; font-size: 26px; }
+
+.search {
+	display: block; width: 720px; height: 72px; margin-bottom: 24px; padding: 0 24px; border-radius: 14px;
+	background: #262a31; color: inherit; font: inherit; font-size: 28px;
+	border: 4px solid transparent; transition: border-color 120ms;
+}
+.search::placeholder { color: #8a9099; }
+
 /* Focus must be obvious from 3 metres away */
 .focused { border-color: #e6007e !important; transform: scale(1.08); background: #333842; }
+.search.focused { transform: none; }
+/* A text field being typed into */
+.editing { border-color: #fff !important; background: #1b1e23; }
 
 .panel { font-size: 26px; line-height: 1.6; color: #c8ccd2; }
 .panel b { color: #fff; }
@@ -32,9 +49,8 @@ h2 { font-size: 30px; font-weight: 600; color: #9aa0a6; margin: 0 0 16px; }
 
 .overlay {
 	position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7);
-	display: none; align-items: center; justify-content: center;
+	display: flex; align-items: center; justify-content: center;
 }
-.overlay.open { display: flex; }
 .dialog { background: #1f2329; border-radius: 24px; padding: 48px 56px; width: 900px; }
 .dialog p { font-size: 28px; color: #c8ccd2; line-height: 1.5; margin: 0 0 32px; }
 .dialog .row { margin: 0; }

@@ -2,13 +2,13 @@
 // page on the TV whenever a file in app/ changes. HTML responses get a tiny live-reload
 // client (Server-Sent Events) injected before </body>.
 //
-//   node scripts/dev-server.mjs [port]        (default 5500, or DEV_PORT)
+//   node scripts/dev-server.mjs [port]        (default: DEV_PORT from the environment or .env, else 5500; 0 = any free port)
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { APP_DIR, loadSettings } from './lib.mjs';
 
-const APP_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'app');
-const PORT = Number(process.argv[2] || process.env.DEV_PORT || 5500);
+const PORT = Number(process.argv[2] ?? loadSettings().DEV_PORT);
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -31,6 +31,17 @@ const RELOAD_CLIENT = `<script>(function () {
 const clients = new Set();
 
 const server = http.createServer((req, res) => {
+  try {
+    handle(req, res);
+  } catch (e) {
+    // A bad request must never take the server down mid-session
+    console.error(`error serving ${req.url}: ${e.message}`);
+    if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
+    res.end('Server error');
+  }
+});
+
+function handle(req, res) {
   const url = new URL(req.url, 'http://local');
 
   if (url.pathname === '/__reload') {
@@ -42,7 +53,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const rel = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+  let rel;
+  try {
+    rel = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain' }).end('Bad request: malformed URL');
+    return;
+  }
+  if (rel.includes('\0')) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' }).end('Bad request');
+    return;
+  }
   const file = path.join(APP_DIR, rel);
   if (!file.startsWith(APP_DIR + path.sep)) {
     res.writeHead(403).end();
@@ -62,7 +83,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' });
     res.end(body);
   });
-});
+}
 
 // Editors write files in bursts (temp file, rename, chmod); reload once per burst
 let timer;
@@ -80,4 +101,4 @@ setInterval(() => {
   for (const c of clients) c.write(': ping\n\n');
 }, 15000);
 
-server.listen(PORT, '0.0.0.0', () => console.log(`Serving app/ on :${PORT} with live reload`));
+server.listen(PORT, '0.0.0.0', () => console.log(`Serving app/ on :${server.address().port} with live reload`));

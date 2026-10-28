@@ -1,0 +1,27 @@
+# Runs everything that doesn't need a TV: tv.js interaction tests in headless Chromium, the tooling tests
+# (project generation, manifest diagnostics, dev/packaged targeting, .env settings, dev server) and packaging.
+# Real-TV checks stay a manual release step (see "Releasing" in the README).
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest] # Windows is unverified: the scripts need bash, curl and nc
+        node: [22, 24] # package.json "engines" minimum, and the LTS in .nvmrc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm install -g @webos-tools/cli@3.2.6 # the version the README says is validated
+      - run: npm test
