@@ -32,6 +32,9 @@ before(async () => {
 after(async () => { await browser?.close(); });
 
 beforeEach(async () => {
+  // Park the pointer off every item: Chromium sends a mouseover to whatever lands under a resting pointer after
+  // layout, which would hover-focus an item at a racy moment in the next test
+  await page.mouse.move(0, 0);
   await page.setContent(FIXTURE);
   await page.addScriptTag({ path: path.join(APP_DIR, "js/tv.js") });
   // Instrumentation: every action TV.onInput sees, every _select call, every onRowFocus call
